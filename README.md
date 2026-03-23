@@ -1,2 +1,0 @@
-# Storyteller
-AI Storytelling assistant
