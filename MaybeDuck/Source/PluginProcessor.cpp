@@ -18,8 +18,10 @@ MaybeDuckAudioProcessor::MaybeDuckAudioProcessor()
                        .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
                       #endif
                        .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
-                     #endif
-                       )
+                       .withInput  ("Sidechain", juce::AudioChannelSet::stereo(), true)
+                       #endif
+                       ),
+                       apvts(*this, nullptr, "PARAMETERS", createParameterLayout())
 #endif
 {
 }
@@ -28,10 +30,44 @@ MaybeDuckAudioProcessor::~MaybeDuckAudioProcessor()
 {
 }
 
+juce::AudioProcessorValueTreeState::ParameterLayout MaybeDuckAudioProcessor::createParameterLayout()
+{
+    std::vector<std::unique_ptr<juce::RangedAudioParameter>> params;
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "threshold", "Threshold", juce::NormalisableRange<float>(-60.0f, 0.0f, 0.1f), -10.0f));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "ratio", "Ratio", juce::NormalisableRange<float>(1.0f, 50.0f, 0.1f), 4.0f));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "attack", "Attack", juce::NormalisableRange<float>(0.1f, 200.0f, 0.1f, 0.5f), 10.0f));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "release", "Release", juce::NormalisableRange<float>(1.0f, 1000.0f, 1.0f, 0.5f), 100.0f));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "knee", "Knee", juce::NormalisableRange<float>(0.0f, 24.0f, 0.1f), 6.0f));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "output", "Output", juce::NormalisableRange<float>(-24.0f, 24.0f, 0.1f), 0.0f));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        "sidechainEnable", "Enable Sidechain", false));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        "softKnee", "Soft Knee", true));
+
+    params.push_back(std::make_unique<juce::AudioParameterBool>(
+        "limiter", "Limiter", false));
+
+    return { params.begin(), params.end() };
+}
+
 //==============================================================================
 const juce::String MaybeDuckAudioProcessor::getName() const
 {
-    return JucePlugin_Name;
+    return "MaybeDuck";
 }
 
 bool MaybeDuckAudioProcessor::acceptsMidi() const
@@ -93,8 +129,8 @@ void MaybeDuckAudioProcessor::changeProgramName (int index, const juce::String& 
 //==============================================================================
 void MaybeDuckAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
-    // Use this method as the place to do any pre-playback
-    // initialisation that you need..
+    leftProcessor.reset(sampleRate);
+    rightProcessor.reset(sampleRate);
 }
 
 void MaybeDuckAudioProcessor::releaseResources()
@@ -150,11 +186,49 @@ void MaybeDuckAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     // the samples and the outer loop is handling the channels.
     // Alternatively, you can process the samples with the channels
     // interleaved by keeping the same state.
-    for (int channel = 0; channel < totalNumInputChannels; ++channel)
-    {
-        auto* channelData = buffer.getWritePointer (channel);
+    DynamicsProcessorParameters params = leftProcessor.getParameters();
 
-        // ..do something to the data...
+    params.threshold_dB   = *apvts.getRawParameterValue("threshold");
+    params.ratio          = *apvts.getRawParameterValue("ratio");
+    params.attack_ms      = *apvts.getRawParameterValue("attack");
+    params.release_ms     = *apvts.getRawParameterValue("release");
+    params.knee_width_dB  = *apvts.getRawParameterValue("knee");
+    params.output_gain_dB = *apvts.getRawParameterValue("output");
+    params.enable_sc      = (*apvts.getRawParameterValue("sidechainEnable") > 0.5f);
+    params.soft_knee      = (*apvts.getRawParameterValue("softKnee") > 0.5f);
+    params.hard_limit_gate= (*apvts.getRawParameterValue("limiter") > 0.5f);
+    params.calculation    = dynamicsProcessorType::kCompressor;
+
+    leftProcessor.setParameters(params);
+    rightProcessor.setParameters(params);
+
+    auto* left  = buffer.getWritePointer(0);
+    auto* right = buffer.getNumChannels() > 1 ? buffer.getWritePointer(1) : nullptr;
+
+    juce::AudioBuffer<float> mainInput = getBusBuffer(buffer, true, 0);
+    juce::AudioBuffer<float> scInput   = getBusBuffer(buffer, true, 1);
+
+    const bool hasSidechainBus = getBusCount(true) > 1;
+    const bool scConnected = hasSidechainBus && scInput.getNumChannels() > 0;
+
+    for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
+    {
+        float scL = 0.0f;
+        float scR = 0.0f;
+
+        if (params.enable_sc && scConnected)
+        {
+            scL = scInput.getReadPointer(0)[sample];
+            scR = scInput.getNumChannels() > 1 ? scInput.getReadPointer(1)[sample] : scL;
+
+            leftProcessor.processSidechainInputSample(scL);
+            rightProcessor.processSidechainInputSample(scR);
+        }
+
+        left[sample] = (float) leftProcessor.processSample(left[sample]);
+
+        if (right != nullptr)
+            right[sample] = (float) rightProcessor.processSample(right[sample]);
     }
 }
 
