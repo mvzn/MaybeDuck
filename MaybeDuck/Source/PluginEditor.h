@@ -29,5 +29,15 @@ private:
     // access the processor object that created it.
     MaybeDuckAudioProcessor& audioProcessor;
 
+    juce::Slider thresholdSlider, ratioSlider, attackSlider, releaseSlider, kneeSlider, outputSlider;
+    juce::ToggleButton sidechainButton, softKneeButton, limiterButton;
+
+    using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
+    using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
+
+    std::unique_ptr<SliderAttachment> thresholdAttachment, ratioAttachment, attackAttachment,
+                                      releaseAttachment, kneeAttachment, outputAttachment;
+
+    std::unique_ptr<ButtonAttachment> sidechainAttachment, softKneeAttachment, limiterAttachment;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MaybeDuckAudioProcessorEditor)
 };
