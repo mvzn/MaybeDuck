@@ -30,8 +30,11 @@ private:
     MaybeDuckAudioProcessor& audioProcessor;
 
     juce::Slider thresholdSlider, ratioSlider, attackSlider, releaseSlider, kneeSlider, outputSlider;
-    juce::ToggleButton sidechainButton, softKneeButton, limiterButton;
+    juce::Label thresholdLabel, ratioLabel, attackLabel, releaseLabel, kneeLabel, outputLabel;
 
+    juce::ToggleButton sidechainButton, softKneeButton, limiterButton;
+    juce::Label cpuLabel, blockLabel, sampleRateLabel, grLabel;
+    
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
 

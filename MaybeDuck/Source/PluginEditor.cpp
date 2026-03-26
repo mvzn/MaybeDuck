@@ -21,12 +21,32 @@ MaybeDuckAudioProcessorEditor::MaybeDuckAudioProcessorEditor (MaybeDuckAudioProc
         addAndMakeVisible(s);
     };
 
+    auto setupLabel = [this](juce::Label& l, const juce::String& text)
+    {
+    l.setText(text, juce::dontSendNotification);
+    l.setJustificationType(juce::Justification::centred);
+    l.setColour(juce::Label::textColourId, juce::Colours::white);
+    addAndMakeVisible(l);
+    };
+
     setupSlider(thresholdSlider, "Threshold");
     setupSlider(ratioSlider,     "Ratio");
     setupSlider(attackSlider,    "Attack");
     setupSlider(releaseSlider,   "Release");
     setupSlider(kneeSlider,      "Knee");
     setupSlider(outputSlider,    "Output");
+
+    setupLabel(thresholdLabel, "Threshold");
+    setupLabel(ratioLabel,     "Ratio");
+    setupLabel(attackLabel,    "Attack");
+    setupLabel(releaseLabel,   "Release");
+    setupLabel(kneeLabel,      "Knee");
+    setupLabel(outputLabel,    "Output");
+
+    setupLabel(cpuLabel,       "CPU: --");
+    setupLabel(blockLabel,     "Block: --");
+    setupLabel(sampleRateLabel,"SR: --");
+    setupLabel(grLabel,        "GR: -- dB");
 
     sidechainButton.setButtonText("Enable Sidechain");
     softKneeButton.setButtonText("Soft Knee");
@@ -47,7 +67,7 @@ MaybeDuckAudioProcessorEditor::MaybeDuckAudioProcessorEditor (MaybeDuckAudioProc
     softKneeAttachment  = std::make_unique<ButtonAttachment>(audioProcessor.apvts, "softKnee", softKneeButton);
     limiterAttachment   = std::make_unique<ButtonAttachment>(audioProcessor.apvts, "limiter", limiterButton);
 
-    setSize (520, 260);
+    setSize (1000, 1000);
 }
 
 MaybeDuckAudioProcessorEditor::~MaybeDuckAudioProcessorEditor()
@@ -68,20 +88,37 @@ void MaybeDuckAudioProcessorEditor::paint (juce::Graphics& g)
 void MaybeDuckAudioProcessorEditor::resized()
 {
     auto area = getLocalBounds().reduced(10);
-    area.removeFromTop(30);
+    auto titleArea = area.removeFromTop(30);
+    auto spectrumArea = area.removeFromTop(150);
+    auto sliderArea = area.removeFromTop(170);
+    auto buttonArea = area.removeFromTop(35);
+    auto statsArea = area;
 
-    auto top = area.removeFromTop(160);
-    auto w = top.getWidth() / 6;
+    auto columnWidth = sliderArea.getWidth() / 6;
 
-    thresholdSlider.setBounds(top.removeFromLeft(w).reduced(5));
-    ratioSlider.setBounds    (top.removeFromLeft(w).reduced(5));
-    attackSlider.setBounds   (top.removeFromLeft(w).reduced(5));
-    releaseSlider.setBounds  (top.removeFromLeft(w).reduced(5));
-    kneeSlider.setBounds     (top.removeFromLeft(w).reduced(5));
-    outputSlider.setBounds   (top.removeFromLeft(w).reduced(5));
+    auto layoutSliderWithLabel = [&](juce::Slider& slider, juce::Label& label)
+    {
+        auto col = sliderArea.removeFromLeft(columnWidth).reduced(4);
+        auto labelArea = col.removeFromTop(20);
+        auto knobArea  = col;
+        label.setBounds(labelArea);
+        slider.setBounds(knobArea);
+    };
 
-    auto bottom = area.removeFromTop(40);
-    sidechainButton.setBounds(bottom.removeFromLeft(170));
-    softKneeButton.setBounds (bottom.removeFromLeft(120));
-    limiterButton.setBounds  (bottom.removeFromLeft(100));
+    layoutSliderWithLabel(thresholdSlider, thresholdLabel);
+    layoutSliderWithLabel(ratioSlider,     ratioLabel);
+    layoutSliderWithLabel(attackSlider,    attackLabel);
+    layoutSliderWithLabel(releaseSlider,   releaseLabel);
+    layoutSliderWithLabel(kneeSlider,      kneeLabel);
+    layoutSliderWithLabel(outputSlider,    outputLabel);
+
+    sidechainButton.setBounds(buttonArea.removeFromLeft(170));
+    softKneeButton.setBounds (buttonArea.removeFromLeft(120));
+    limiterButton.setBounds  (buttonArea.removeFromLeft(100));
+
+    auto statW = statsArea.getWidth() / 4;
+    cpuLabel.setBounds(statsArea.removeFromLeft(statW));
+    blockLabel.setBounds(statsArea.removeFromLeft(statW));
+    sampleRateLabel.setBounds(statsArea.removeFromLeft(statW));
+    grLabel.setBounds(statsArea.removeFromLeft(statW));
 }
