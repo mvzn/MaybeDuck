@@ -20,27 +20,45 @@ SpectrumComponent::SpectrumComponent(MaybeDuckAudioProcessor& p)
     inputPeaks.resize(numBins, -100.0f);
     sidechainPeaks.resize(numBins, -100.0f);
     outputPeaks.resize(numBins, -100.0f);
+
+    inputPeakHoldCounters.resize(numBins, 0);
+    sidechainPeakHoldCounters.resize(numBins, 0);
+    outputPeakHoldCounters.resize(numBins, 0);
 }
 
 void SpectrumComponent::update()
 {
     bool changed = false;
 
+    const bool sidechainEnabled = (*processor.apvts.getRawParameterValue("sidechainEnable") > 0.5f);
+
+    const bool showSidechain = sidechainEnabled && processor.isSidechainConnected();
+
     if (processor.getInputFftData(scratchBuffer.data()))
     {
-        processSpectrumFrame(scratchBuffer.data(), inputMagnitudes, inputPeaks);
+        processSpectrumFrame(scratchBuffer.data(), inputMagnitudes, inputPeaks, inputPeakHoldCounters);
         changed = true;
     }
 
-    if (processor.getSidechainFftData(scratchBuffer.data()))
+    if (showSidechain && processor.getSidechainFftData(scratchBuffer.data()))
     {
-        processSpectrumFrame(scratchBuffer.data(), sidechainMagnitudes, sidechainPeaks);
+        processSpectrumFrame(scratchBuffer.data(), sidechainMagnitudes, sidechainPeaks, sidechainPeakHoldCounters);
+        changed = true;
+    }
+    else
+    {
+        for (size_t i = 0; i < sidechainMagnitudes.size(); ++i)
+        {
+            sidechainMagnitudes[i] = juce::jmax(-90.0f, sidechainMagnitudes[i] - 2.5f);
+            sidechainPeaks[i]      = juce::jmax(-90.0f, sidechainPeaks[i] - 1.5f);
+            sidechainPeakHoldCounters[i] = 0;
+        }
         changed = true;
     }
 
     if (processor.getOutputFftData(scratchBuffer.data()))
     {
-        processSpectrumFrame(scratchBuffer.data(), outputMagnitudes, outputPeaks);
+        processSpectrumFrame(scratchBuffer.data(), outputMagnitudes, outputPeaks, outputPeakHoldCounters);
         changed = true;
     }
 
@@ -50,7 +68,8 @@ void SpectrumComponent::update()
 
 void SpectrumComponent::processSpectrumFrame(const float* fftData,
                                              std::vector<float>& magnitudes,
-                                             std::vector<float>& peaks)
+                                             std::vector<float>& peaks,
+                                             std::vector<int>& peakHoldCounters)
 {
     std::fill(fftBuffer.begin(), fftBuffer.end(), 0.0f);
     std::copy(fftData, fftData + MaybeDuckAudioProcessor::fftSize, fftBuffer.begin());
@@ -61,6 +80,8 @@ void SpectrumComponent::processSpectrumFrame(const float* fftData,
     const int numBins = MaybeDuckAudioProcessor::fftSize / 2;
     constexpr float minDb = -90.0f;
     constexpr float maxDb = 0.0f;
+    constexpr int peakHoldFrames = 5;      // short hold
+    constexpr float peakDecayPerFrame = 0.18f; // slower decay
 
     for (int i = 1; i < numBins; ++i)
     {
@@ -68,7 +89,23 @@ void SpectrumComponent::processSpectrumFrame(const float* fftData,
         const float db = juce::jlimit(minDb, maxDb, juce::Decibels::gainToDecibels(mag, minDb));
 
         magnitudes[(size_t) i] = db;
-        peaks[(size_t) i] = juce::jmax(db, peaks[(size_t) i] - 0.5f);
+
+        if (db >= peaks[(size_t) i])
+        {
+            peaks[(size_t) i] = db;
+            peakHoldCounters[(size_t) i] = peakHoldFrames;
+        }
+        else
+        {
+            if (peakHoldCounters[(size_t) i] > 0)
+            {
+                --peakHoldCounters[(size_t) i];
+            }
+            else
+            {
+                peaks[(size_t) i] = juce::jmax(minDb, peaks[(size_t) i] - peakDecayPerFrame);
+            }
+        }
     }
 }
 
@@ -165,7 +202,7 @@ void SpectrumComponent::paint(juce::Graphics& g)
         g.setColour(fillColour.withAlpha(0.27f));
         g.fillPath(fillPath);
 
-        g.setColour(peakColour.withAlpha(0.95f));
+        g.setColour(peakColour.withAlpha(0.8f));
         g.strokePath(peakPath, juce::PathStrokeType(1.6f, juce::PathStrokeType::curved, juce::PathStrokeType::rounded));
     };
 

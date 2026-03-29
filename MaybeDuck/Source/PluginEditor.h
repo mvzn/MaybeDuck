@@ -80,7 +80,10 @@ public:
     void resized() override {}
 
 private:
-    void processSpectrumFrame(const float* fftData, std::vector<float>& magnitudes, std::vector<float>& peaks);
+    void processSpectrumFrame(const float* fftData,
+                          std::vector<float>& magnitudes,
+                          std::vector<float>& peaks,
+                          std::vector<int>& peakHoldCounters);
     juce::Path buildSpectrumPath(const std::vector<float>& values, juce::Rectangle<float> area) const;
     juce::Path buildFillPath(const juce::Path& linePath, juce::Rectangle<float> area) const;
     float binToX(int bin, float width) const;
@@ -101,6 +104,10 @@ private:
     std::vector<float> inputPeaks;
     std::vector<float> sidechainPeaks;
     std::vector<float> outputPeaks;
+
+    std::vector<int> inputPeakHoldCounters;
+    std::vector<int> sidechainPeakHoldCounters;
+    std::vector<int> outputPeakHoldCounters;
 };
 
 class MaybeDuckAudioProcessorEditor  : public juce::AudioProcessorEditor,
