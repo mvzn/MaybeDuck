@@ -275,14 +275,15 @@ void MaybeDuckAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juc
         float inL = mainInput.getReadPointer(0)[sample];
         float inR = mainInput.getNumChannels() > 1 ? mainInput.getReadPointer(1)[sample] : inL;
         float inputMono = 0.5f * (inL + inR);
+        float scMono = 0.5f * (scL + scR);
         blockPeakIn = std::max(blockPeakIn, std::abs(inputMono));
-        float scMono = 0.0f;
+        
 
         if (params.enable_sc && scConnected)
         {
             scL = scInput.getReadPointer(0)[sample];
             scR = scInput.getNumChannels() > 1 ? scInput.getReadPointer(1)[sample] : scL;
-
+            blockPeakIn = std::max(blockPeakIn, std::abs(scMono));
             leftProcessor.processSidechainInputSample(scL);
             rightProcessor.processSidechainInputSample(scR);
             scMono = 0.5f * (scL + scR);
@@ -314,7 +315,7 @@ void MaybeDuckAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juc
                                   
     // for above threshold and gr comparison
     const float thresholdDb = params.threshold_dB;
-    const float aboveThreshold = std::max(0.0f, blockPeakDb - thresholdDb);
+    const float aboveThreshold = std::max(0.0f, blockPeakDb - thresholdDb); //NOT CORRECT IF PROPORTIONAL, scBlockPeakDb - thresholdDb
 
     // simple smoothing for UI
     inputLevelSmoothedDb = juce::jmax(blockPeakDb, inputLevelSmoothedDb + 0.8f);       // fast rise, slow fall
