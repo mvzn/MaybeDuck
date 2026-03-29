@@ -221,6 +221,9 @@ MaybeDuckAudioProcessorEditor::MaybeDuckAudioProcessorEditor (MaybeDuckAudioProc
     setupLabel(kneeLabel,      "Knee");
     setupLabel(outputLabel,    "Output");
 
+    setupLabel(aboveThresholdLabel, "Above Thr: -- dB");
+    setupLabel(grLabel,             "GR: -- dB");
+
     setupLabel(cpuLabel,       "CPU: --");
     setupLabel(blockLabel,     "Block: --");
     setupLabel(sampleRateLabel,"SR: --");
@@ -306,7 +309,9 @@ void MaybeDuckAudioProcessorEditor::resized()
     softKneeButton.setBounds (buttonArea.removeFromLeft(120));
     limiterButton.setBounds  (buttonArea.removeFromLeft(100));
 
-    auto statW = statsArea.getWidth() / 3;
+    auto statW = statsArea.getWidth() / 5;
+    aboveThresholdLabel.setBounds(statsArea.removeFromLeft(statW));
+    grLabel.setBounds(statsArea.removeFromLeft(statW));
     cpuLabel.setBounds(statsArea.removeFromLeft(statW));
     blockLabel.setBounds(statsArea.removeFromLeft(statW));
     sampleRateLabel.setBounds(statsArea.removeFromLeft(statW));
@@ -314,17 +319,14 @@ void MaybeDuckAudioProcessorEditor::resized()
 
 void MaybeDuckAudioProcessorEditor::timerCallback()
 {
-    cpuLabel.setText("CPU: " + juce::String(audioProcessor.getCpuUsagePercent(), 1) + " %",
-                     juce::dontSendNotification);
+    aboveThresholdLabel.setText("Above Thr: " + juce::String(audioProcessor.getAboveThresholdDb(), 1) + " dB", juce::dontSendNotification);
 
-    blockLabel.setText("Block: " + juce::String(audioProcessor.getCurrentBlockSize()),
-                       juce::dontSendNotification);
+    grLabel.setText("GR: " + juce::String(audioProcessor.getGainReductionAmountDb(), 1) + " dB", juce::dontSendNotification);
+    cpuLabel.setText("CPU: " + juce::String(audioProcessor.getCpuUsagePercent(), 1) + " %", juce::dontSendNotification);
+    blockLabel.setText("Block: " + juce::String(audioProcessor.getCurrentBlockSize()), juce::dontSendNotification);
+    sampleRateLabel.setText("SR: " + juce::String(audioProcessor.getCurrentSampleRateHz(), 0) + " Hz", juce::dontSendNotification);
 
-    sampleRateLabel.setText("SR: " + juce::String(audioProcessor.getCurrentSampleRateHz(), 0) + " Hz",
-                            juce::dontSendNotification);
-
-    compressorMeter.setLevels(audioProcessor.getInputLevelDb(),
-                              audioProcessor.getGainReductionAmountDb());
+    compressorMeter.setLevels(audioProcessor.getInputLevelDb(), audioProcessor.getGainReductionAmountDb());
 
     spectrumComponent.update();
 }

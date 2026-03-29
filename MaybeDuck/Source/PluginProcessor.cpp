@@ -306,11 +306,15 @@ void MaybeDuckAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juc
 
     // avgGR is <= 0 for compression, convert to positive amount for the meter
     const float grAmountDb = std::max(0.0f, -avgGR);
-
+    
     // input peak to dB
     const float blockPeakDb = (blockPeakIn > 0.000001f)
                                   ? juce::Decibels::gainToDecibels(blockPeakIn)
                                   : -100.0f;
+                                  
+    // for above threshold and gr comparison
+    const float thresholdDb = params.threshold_dB;
+    const float aboveThreshold = std::max(0.0f, blockPeakDb - thresholdDb);
 
     // simple smoothing for UI
     inputLevelSmoothedDb = juce::jmax(blockPeakDb, inputLevelSmoothedDb + 0.8f);       // fast rise, slow fall
@@ -326,11 +330,12 @@ void MaybeDuckAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juc
 
     const double blockDurationMs =
         1000.0 * (double) buffer.getNumSamples() / std::max(1.0, getSampleRate());
-
+    
     cpuUsagePercent.store(blockDurationMs > 0.0
         ? (float) (100.0 * elapsedMs / blockDurationMs)
         : 0.0f);
-
+    
+    aboveThresholdDb.store(aboveThreshold);
     currentBlockSize.store(buffer.getNumSamples());
     sidechainConnected.store(scConnected);
 }
