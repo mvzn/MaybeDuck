@@ -12,16 +12,16 @@
 //==============================================================================
 MaybeDuckAudioProcessor::MaybeDuckAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
-     : AudioProcessor (BusesProperties()
-                     #if ! JucePlugin_IsMidiEffect
-                      #if ! JucePlugin_IsSynth
-                       .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
-                      #endif
-                       .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
-                       .withInput  ("Sidechain", juce::AudioChannelSet::stereo(), true)
-                       #endif
-                       ),
-                       apvts(*this, nullptr, "PARAMETERS", createParameterLayout())
+    : AudioProcessor(BusesProperties()
+#if !JucePlugin_IsMidiEffect
+#if !JucePlugin_IsSynth
+                         .withInput("Input", juce::AudioChannelSet::stereo(), true)
+#endif
+                         .withOutput("Output", juce::AudioChannelSet::stereo(), true)
+                         .withInput("Sidechain", juce::AudioChannelSet::stereo(), true)
+#endif
+                         ),
+      apvts(*this, nullptr, "PARAMETERS", createParameterLayout())
 #endif
 {
 }
@@ -61,7 +61,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout MaybeDuckAudioProcessor::cre
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         "limiter", "Limiter", false));
 
-    return { params.begin(), params.end() };
+    return {params.begin(), params.end()};
 }
 
 //==============================================================================
@@ -72,29 +72,29 @@ const juce::String MaybeDuckAudioProcessor::getName() const
 
 bool MaybeDuckAudioProcessor::acceptsMidi() const
 {
-   #if JucePlugin_WantsMidiInput
+#if JucePlugin_WantsMidiInput
     return true;
-   #else
+#else
     return false;
-   #endif
+#endif
 }
 
 bool MaybeDuckAudioProcessor::producesMidi() const
 {
-   #if JucePlugin_ProducesMidiOutput
+#if JucePlugin_ProducesMidiOutput
     return true;
-   #else
+#else
     return false;
-   #endif
+#endif
 }
 
 bool MaybeDuckAudioProcessor::isMidiEffect() const
 {
-   #if JucePlugin_IsMidiEffect
+#if JucePlugin_IsMidiEffect
     return true;
-   #else
+#else
     return false;
-   #endif
+#endif
 }
 
 double MaybeDuckAudioProcessor::getTailLengthSeconds() const
@@ -104,8 +104,8 @@ double MaybeDuckAudioProcessor::getTailLengthSeconds() const
 
 int MaybeDuckAudioProcessor::getNumPrograms()
 {
-    return 1;   // NB: some hosts don't cope very well if you tell them there are 0 programs,
-                // so this should be at least 1, even if you're not really implementing programs.
+    return 1; // NB: some hosts don't cope very well if you tell them there are 0 programs,
+              // so this should be at least 1, even if you're not really implementing programs.
 }
 
 int MaybeDuckAudioProcessor::getCurrentProgram()
@@ -113,27 +113,77 @@ int MaybeDuckAudioProcessor::getCurrentProgram()
     return 0;
 }
 
-void MaybeDuckAudioProcessor::setCurrentProgram (int index)
+void MaybeDuckAudioProcessor::setCurrentProgram(int index)
 {
 }
 
-const juce::String MaybeDuckAudioProcessor::getProgramName (int index)
+const juce::String MaybeDuckAudioProcessor::getProgramName(int index)
 {
     return {};
 }
 
-void MaybeDuckAudioProcessor::changeProgramName (int index, const juce::String& newName)
+void MaybeDuckAudioProcessor::changeProgramName(int index, const juce::String &newName)
 {
 }
 
 //==============================================================================
-void MaybeDuckAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBlock)
+void MaybeDuckAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
     leftProcessor.reset(sampleRate);
     rightProcessor.reset(sampleRate);
 
     currentSampleRate.store(sampleRate);
     currentBlockSize.store(samplesPerBlock);
+}
+
+void MaybeDuckAudioProcessor::pushNextSampleIntoFifo(float sample,
+                                                     float *fifo,
+                                                     int &index,
+                                                     float *fftBuffer,
+                                                     std::atomic<bool> &readyFlag)
+{
+    if (index == fftSize)
+        return;
+
+    fifo[index++] = sample;
+
+    if (index == fftSize)
+    {
+        const juce::ScopedLock sl(fftDataLock);
+        std::copy(fifo, fifo + fftSize, fftBuffer);
+        readyFlag.store(true);
+        index = 0;
+    }
+}
+
+bool MaybeDuckAudioProcessor::getInputFftData(float *dest)
+{
+    if (!inputBlockReady.exchange(false))
+        return false;
+
+    const juce::ScopedLock sl(fftDataLock);
+    std::copy(inputFftBuffer, inputFftBuffer + fftSize, dest);
+    return true;
+}
+
+bool MaybeDuckAudioProcessor::getSidechainFftData(float *dest)
+{
+    if (!sidechainBlockReady.exchange(false))
+        return false;
+
+    const juce::ScopedLock sl(fftDataLock);
+    std::copy(sidechainFftBuffer, sidechainFftBuffer + fftSize, dest);
+    return true;
+}
+
+bool MaybeDuckAudioProcessor::getOutputFftData(float *dest)
+{
+    if (!outputBlockReady.exchange(false))
+        return false;
+
+    const juce::ScopedLock sl(fftDataLock);
+    std::copy(outputFftBuffer, outputFftBuffer + fftSize, dest);
+    return true;
 }
 
 void MaybeDuckAudioProcessor::releaseResources()
@@ -143,35 +193,34 @@ void MaybeDuckAudioProcessor::releaseResources()
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
-bool MaybeDuckAudioProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
+bool MaybeDuckAudioProcessor::isBusesLayoutSupported(const BusesLayout &layouts) const
 {
-  #if JucePlugin_IsMidiEffect
-    juce::ignoreUnused (layouts);
+#if JucePlugin_IsMidiEffect
+    juce::ignoreUnused(layouts);
     return true;
-  #else
+#else
     // This is the place where you check if the layout is supported.
     // In this template code we only support mono or stereo.
     // Some plugin hosts, such as certain GarageBand versions, will only
     // load plugins that support stereo bus layouts.
-    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono()
-     && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
+    if (layouts.getMainOutputChannelSet() != juce::AudioChannelSet::mono() && layouts.getMainOutputChannelSet() != juce::AudioChannelSet::stereo())
         return false;
 
     // This checks if the input layout matches the output layout
-   #if ! JucePlugin_IsSynth
+#if !JucePlugin_IsSynth
     if (layouts.getMainOutputChannelSet() != layouts.getMainInputChannelSet())
         return false;
-   #endif
+#endif
 
     return true;
-  #endif
+#endif
 }
 #endif
 
-void MaybeDuckAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+void MaybeDuckAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juce::MidiBuffer &midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
-    auto totalNumInputChannels  = getTotalNumInputChannels();
+    auto totalNumInputChannels = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
 
     const auto startTime = juce::Time::getHighResolutionTicks();
@@ -184,7 +233,7 @@ void MaybeDuckAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     // when they first compile a plugin, but obviously you don't need to keep
     // this code if your algorithm always overwrites all the output channels.
     for (auto i = totalNumInputChannels; i < totalNumOutputChannels; ++i)
-        buffer.clear (i, 0, buffer.getNumSamples());
+        buffer.clear(i, 0, buffer.getNumSamples());
 
     // This is the place where you'd normally do the guts of your plugin's
     // audio processing...
@@ -194,44 +243,40 @@ void MaybeDuckAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     // interleaved by keeping the same state.
     DynamicsProcessorParameters params = leftProcessor.getParameters();
 
-    params.threshold_dB   = *apvts.getRawParameterValue("threshold");
-    params.ratio          = *apvts.getRawParameterValue("ratio");
-    params.attack_ms      = *apvts.getRawParameterValue("attack");
-    params.release_ms     = *apvts.getRawParameterValue("release");
-    params.knee_width_dB  = *apvts.getRawParameterValue("knee");
+    params.threshold_dB = *apvts.getRawParameterValue("threshold");
+    params.ratio = *apvts.getRawParameterValue("ratio");
+    params.attack_ms = *apvts.getRawParameterValue("attack");
+    params.release_ms = *apvts.getRawParameterValue("release");
+    params.knee_width_dB = *apvts.getRawParameterValue("knee");
     params.output_gain_dB = *apvts.getRawParameterValue("output");
-    params.enable_sc      = (*apvts.getRawParameterValue("sidechainEnable") > 0.5f);
-    params.soft_knee      = (*apvts.getRawParameterValue("softKnee") > 0.5f);
-    params.hard_limit_gate= (*apvts.getRawParameterValue("limiter") > 0.5f);
-    params.calculation    = dynamicsProcessorType::kCompressor;
+    params.enable_sc = (*apvts.getRawParameterValue("sidechainEnable") > 0.5f);
+    params.soft_knee = (*apvts.getRawParameterValue("softKnee") > 0.5f);
+    params.hard_limit_gate = (*apvts.getRawParameterValue("limiter") > 0.5f);
+    params.calculation = dynamicsProcessorType::kCompressor;
 
     leftProcessor.setParameters(params);
     rightProcessor.setParameters(params);
 
-    auto* left  = buffer.getWritePointer(0);
-    auto* right = buffer.getNumChannels() > 1 ? buffer.getWritePointer(1) : nullptr;
-
     juce::AudioBuffer<float> mainInput = getBusBuffer(buffer, true, 0);
-    juce::AudioBuffer<float> scInput   = getBusBuffer(buffer, true, 1);
+    juce::AudioBuffer<float> scInput = getBusBuffer(buffer, true, 1);
+
+    auto *left = mainInput.getWritePointer(0);
+    auto *right = mainInput.getNumChannels() > 1 ? mainInput.getWritePointer(1) : nullptr;
 
     const bool hasSidechainBus = getBusCount(true) > 1;
     const bool scConnected = hasSidechainBus && scInput.getNumChannels() > 0;
 
-    const auto endTime = juce::Time::getHighResolutionTicks();
-    const double elapsedMs = 1000.0 * (double)(endTime - startTime) / (double)ticksPerSecond;
-    processTimeMs.store((float)elapsedMs);
-
-    const double blockDurationMs = 1000.0 * (double)buffer.getNumSamples() / std::max(1.0, getSampleRate());
-
-    cpuUsagePercent.store(blockDurationMs > 0.0 ? (float)(100.0 * elapsedMs / blockDurationMs) : 0.0f);
-
-    currentBlockSize.store(buffer.getNumSamples());
-    sidechainConnected.store(scConnected);
+    float blockPeakIn = 0.0f;
 
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
     {
         float scL = 0.0f;
         float scR = 0.0f;
+        float inL = mainInput.getReadPointer(0)[sample];
+        float inR = mainInput.getNumChannels() > 1 ? mainInput.getReadPointer(1)[sample] : inL;
+        float inputMono = 0.5f * (inL + inR);
+        blockPeakIn = std::max(blockPeakIn, std::abs(inputMono));
+        float scMono = 0.0f;
 
         if (params.enable_sc && scConnected)
         {
@@ -240,18 +285,54 @@ void MaybeDuckAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
 
             leftProcessor.processSidechainInputSample(scL);
             rightProcessor.processSidechainInputSample(scR);
+            scMono = 0.5f * (scL + scR);
         }
 
-        left[sample] = (float) leftProcessor.processSample(left[sample]);
+        pushNextSampleIntoFifo(inputMono, inputFifo, inputFifoIndex, inputFftBuffer, inputBlockReady);
+        pushNextSampleIntoFifo(scMono, sidechainFifo, sidechainFifoIndex, sidechainFftBuffer, sidechainBlockReady);
+
+        left[sample] = (float)leftProcessor.processSample(left[sample]);
 
         if (right != nullptr)
-            right[sample] = (float) rightProcessor.processSample(right[sample]);
+            right[sample] = (float)rightProcessor.processSample(right[sample]);
+
+        float outMono = right != nullptr ? 0.5f * (left[sample] + right[sample]) : left[sample];
+        pushNextSampleIntoFifo(outMono, outputFifo, outputFifoIndex, outputFftBuffer, outputBlockReady);
     }
 
     auto lParams = leftProcessor.getParameters();
     auto rParams = rightProcessor.getParameters();
     const float avgGR = 0.5f * (float)(lParams.gain_reduction_dB + rParams.gain_reduction_dB);
+
+    // avgGR is <= 0 for compression, convert to positive amount for the meter
+    const float grAmountDb = std::max(0.0f, -avgGR);
+
+    // input peak to dB
+    const float blockPeakDb = (blockPeakIn > 0.000001f)
+                                  ? juce::Decibels::gainToDecibels(blockPeakIn)
+                                  : -100.0f;
+
+    // simple smoothing for UI
+    inputLevelSmoothedDb = juce::jmax(blockPeakDb, inputLevelSmoothedDb + 0.8f);       // fast rise, slow fall
+    gainReductionSmoothedDb = juce::jmax(grAmountDb, gainReductionSmoothedDb - 0.35f); // hold GR slightly
+
     gainReductionDb.store(avgGR);
+    gainReductionAmountDb.store(gainReductionSmoothedDb);
+    inputLevelDb.store(inputLevelSmoothedDb);
+
+    const auto endTime = juce::Time::getHighResolutionTicks();
+    const double elapsedMs = 1000.0 * (double)(endTime - startTime) / (double)ticksPerSecond;
+    processTimeMs.store((float) elapsedMs);
+
+    const double blockDurationMs =
+        1000.0 * (double) buffer.getNumSamples() / std::max(1.0, getSampleRate());
+
+    cpuUsagePercent.store(blockDurationMs > 0.0
+        ? (float) (100.0 * elapsedMs / blockDurationMs)
+        : 0.0f);
+
+    currentBlockSize.store(buffer.getNumSamples());
+    sidechainConnected.store(scConnected);
 }
 
 //==============================================================================
@@ -260,20 +341,20 @@ bool MaybeDuckAudioProcessor::hasEditor() const
     return true; // (change this to false if you choose to not supply an editor)
 }
 
-juce::AudioProcessorEditor* MaybeDuckAudioProcessor::createEditor()
+juce::AudioProcessorEditor *MaybeDuckAudioProcessor::createEditor()
 {
-    return new MaybeDuckAudioProcessorEditor (*this);
+    return new MaybeDuckAudioProcessorEditor(*this);
 }
 
 //==============================================================================
-void MaybeDuckAudioProcessor::getStateInformation (juce::MemoryBlock& destData)
+void MaybeDuckAudioProcessor::getStateInformation(juce::MemoryBlock &destData)
 {
     auto state = apvts.copyState();
     std::unique_ptr<juce::XmlElement> xml(state.createXml());
     copyXmlToBinary(*xml, destData);
 }
 
-void MaybeDuckAudioProcessor::setStateInformation (const void* data, int sizeInBytes)
+void MaybeDuckAudioProcessor::setStateInformation(const void *data, int sizeInBytes)
 {
     std::unique_ptr<juce::XmlElement> xmlState(getXmlFromBinary(data, sizeInBytes));
 
@@ -284,7 +365,7 @@ void MaybeDuckAudioProcessor::setStateInformation (const void* data, int sizeInB
 
 //==============================================================================
 // This creates new instances of the plugin..
-juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
+juce::AudioProcessor *JUCE_CALLTYPE createPluginFilter()
 {
     return new MaybeDuckAudioProcessor();
 }

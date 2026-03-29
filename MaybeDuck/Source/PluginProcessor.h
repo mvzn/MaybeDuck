@@ -59,13 +59,23 @@ public:
     juce::AudioProcessorValueTreeState apvts;
 
     // monitoring
-    float getCpuUsagePercent() const noexcept   { return cpuUsagePercent.load(); }
-    float getProcessTimeMs() const noexcept     { return processTimeMs.load(); }
-    float getGainReductionDb() const noexcept   { return gainReductionDb.load(); }
+    float getCpuUsagePercent() const noexcept      { return cpuUsagePercent.load(); }
+    float getProcessTimeMs() const noexcept        { return processTimeMs.load(); }
+    float getGainReductionDb() const noexcept      { return gainReductionDb.load(); }   // negative or zero internally
+    float getGainReductionAmountDb() const noexcept{ return gainReductionAmountDb.load(); } // positive for meter
+    float getInputLevelDb() const noexcept         { return inputLevelDb.load(); }
     double getCurrentSampleRateHz() const noexcept { return currentSampleRate.load(); }
-    int getCurrentBlockSize() const noexcept    { return currentBlockSize.load(); }
-    bool isSidechainConnected() const noexcept  { return sidechainConnected.load(); }
+    int getCurrentBlockSize() const noexcept       { return currentBlockSize.load(); }
+    bool isSidechainConnected() const noexcept     { return sidechainConnected.load(); }
 
+    static constexpr int fftOrder = 11;
+    static constexpr int fftSize  = 1 << fftOrder;
+
+    void pushNextSampleIntoFifo(float sample, float* fifo, int& index, float* fftBuffer, std::atomic<bool>& readyFlag);
+
+    bool getInputFftData(float* dest);
+    bool getSidechainFftData(float* dest);
+    bool getOutputFftData(float* dest);
 private:
     DynamicsProcessor leftProcessor;
     DynamicsProcessor rightProcessor;
@@ -74,9 +84,32 @@ private:
     std::atomic<float> cpuUsagePercent { 0.0f };
     std::atomic<float> processTimeMs   { 0.0f };
     std::atomic<float> gainReductionDb { 0.0f };
+    std::atomic<float> gainReductionAmountDb { 0.0f };
+    std::atomic<float> inputLevelDb { -100.0f };
     std::atomic<double> currentSampleRate { 44100.0 };
     std::atomic<int> currentBlockSize { 0 };
     std::atomic<bool> sidechainConnected { false };
+
+    float inputFifo[fftSize] = {};
+    float sidechainFifo[fftSize] = {};
+    float outputFifo[fftSize] = {};
+
+    float inputFftBuffer[fftSize] = {};
+    float sidechainFftBuffer[fftSize] = {};
+    float outputFftBuffer[fftSize] = {};
+
+    int inputFifoIndex = 0;
+    int sidechainFifoIndex = 0;
+    int outputFifoIndex = 0;
+
+    std::atomic<bool> inputBlockReady { false };
+    std::atomic<bool> sidechainBlockReady { false };
+    std::atomic<bool> outputBlockReady { false };
+
+    juce::CriticalSection fftDataLock;
+
+    float inputLevelSmoothedDb = -100.0f;
+    float gainReductionSmoothedDb = 0.0f;
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MaybeDuckAudioProcessor)
 };
