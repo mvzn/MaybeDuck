@@ -57,9 +57,26 @@ public:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
     juce::AudioProcessorValueTreeState apvts;
+
+    // monitoring
+    float getCpuUsagePercent() const noexcept   { return cpuUsagePercent.load(); }
+    float getProcessTimeMs() const noexcept     { return processTimeMs.load(); }
+    float getGainReductionDb() const noexcept   { return gainReductionDb.load(); }
+    double getCurrentSampleRateHz() const noexcept { return currentSampleRate.load(); }
+    int getCurrentBlockSize() const noexcept    { return currentBlockSize.load(); }
+    bool isSidechainConnected() const noexcept  { return sidechainConnected.load(); }
+
 private:
     DynamicsProcessor leftProcessor;
     DynamicsProcessor rightProcessor;
+
+    // monitoring
+    std::atomic<float> cpuUsagePercent { 0.0f };
+    std::atomic<float> processTimeMs   { 0.0f };
+    std::atomic<float> gainReductionDb { 0.0f };
+    std::atomic<double> currentSampleRate { 44100.0 };
+    std::atomic<int> currentBlockSize { 0 };
+    std::atomic<bool> sidechainConnected { false };
     //==============================================================================
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (MaybeDuckAudioProcessor)
 };

@@ -14,7 +14,8 @@
 //==============================================================================
 /**
 */
-class MaybeDuckAudioProcessorEditor  : public juce::AudioProcessorEditor
+class MaybeDuckAudioProcessorEditor  : public juce::AudioProcessorEditor,
+                                       private juce::Timer
 {
 public:
     MaybeDuckAudioProcessorEditor (MaybeDuckAudioProcessor&);
@@ -23,6 +24,8 @@ public:
     //==============================================================================
     void paint (juce::Graphics&) override;
     void resized() override;
+
+    void timerCallback() override;
 
 private:
     // This reference is provided as a quick way for your editor to
@@ -34,7 +37,7 @@ private:
 
     juce::ToggleButton sidechainButton, softKneeButton, limiterButton;
     juce::Label cpuLabel, blockLabel, sampleRateLabel, grLabel;
-    
+
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
 

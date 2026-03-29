@@ -41,10 +41,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout MaybeDuckAudioProcessor::cre
         "ratio", "Ratio", juce::NormalisableRange<float>(1.0f, 50.0f, 0.1f), 4.0f));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "attack", "Attack", juce::NormalisableRange<float>(0.1f, 200.0f, 0.1f, 0.5f), 10.0f));
+        "attack", "Attack", juce::NormalisableRange<float>(0.1f, 5000.0f, 0.1f, 0.5f), 10.0f));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "release", "Release", juce::NormalisableRange<float>(1.0f, 1000.0f, 1.0f, 0.5f), 100.0f));
+        "release", "Release", juce::NormalisableRange<float>(1.0f, 5000.0f, 1.0f, 0.5f), 100.0f));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "knee", "Knee", juce::NormalisableRange<float>(0.0f, 24.0f, 0.1f), 6.0f));
@@ -131,6 +131,9 @@ void MaybeDuckAudioProcessor::prepareToPlay (double sampleRate, int samplesPerBl
 {
     leftProcessor.reset(sampleRate);
     rightProcessor.reset(sampleRate);
+
+    currentSampleRate.store(sampleRate);
+    currentBlockSize.store(samplesPerBlock);
 }
 
 void MaybeDuckAudioProcessor::releaseResources()
@@ -170,6 +173,9 @@ void MaybeDuckAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     juce::ScopedNoDenormals noDenormals;
     auto totalNumInputChannels  = getTotalNumInputChannels();
     auto totalNumOutputChannels = getTotalNumOutputChannels();
+
+    const auto startTime = juce::Time::getHighResolutionTicks();
+    const auto ticksPerSecond = juce::Time::getHighResolutionTicksPerSecond();
 
     // In case we have more outputs than inputs, this code clears any output
     // channels that didn't contain input data, (because these aren't
@@ -211,6 +217,17 @@ void MaybeDuckAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
     const bool hasSidechainBus = getBusCount(true) > 1;
     const bool scConnected = hasSidechainBus && scInput.getNumChannels() > 0;
 
+    const auto endTime = juce::Time::getHighResolutionTicks();
+    const double elapsedMs = 1000.0 * (double)(endTime - startTime) / (double)ticksPerSecond;
+    processTimeMs.store((float)elapsedMs);
+
+    const double blockDurationMs = 1000.0 * (double)buffer.getNumSamples() / std::max(1.0, getSampleRate());
+
+    cpuUsagePercent.store(blockDurationMs > 0.0 ? (float)(100.0 * elapsedMs / blockDurationMs) : 0.0f);
+
+    currentBlockSize.store(buffer.getNumSamples());
+    sidechainConnected.store(scConnected);
+
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
     {
         float scL = 0.0f;
@@ -230,6 +247,11 @@ void MaybeDuckAudioProcessor::processBlock (juce::AudioBuffer<float>& buffer, ju
         if (right != nullptr)
             right[sample] = (float) rightProcessor.processSample(right[sample]);
     }
+
+    auto lParams = leftProcessor.getParameters();
+    auto rParams = rightProcessor.getParameters();
+    const float avgGR = 0.5f * (float)(lParams.gain_reduction_dB + rParams.gain_reduction_dB);
+    gainReductionDb.store(avgGR);
 }
 
 //==============================================================================

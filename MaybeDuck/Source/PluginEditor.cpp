@@ -67,7 +67,9 @@ MaybeDuckAudioProcessorEditor::MaybeDuckAudioProcessorEditor (MaybeDuckAudioProc
     softKneeAttachment  = std::make_unique<ButtonAttachment>(audioProcessor.apvts, "softKnee", softKneeButton);
     limiterAttachment   = std::make_unique<ButtonAttachment>(audioProcessor.apvts, "limiter", limiterButton);
 
-    setSize (1000, 1000);
+    startTimerHz(20);
+
+    setSize (760, 520);
 }
 
 MaybeDuckAudioProcessorEditor::~MaybeDuckAudioProcessorEditor()
@@ -121,4 +123,19 @@ void MaybeDuckAudioProcessorEditor::resized()
     blockLabel.setBounds(statsArea.removeFromLeft(statW));
     sampleRateLabel.setBounds(statsArea.removeFromLeft(statW));
     grLabel.setBounds(statsArea.removeFromLeft(statW));
+}
+
+void MaybeDuckAudioProcessorEditor::timerCallback()
+{
+    cpuLabel.setText("CPU: " + juce::String(audioProcessor.getCpuUsagePercent(), 1) + " %",
+                     juce::dontSendNotification);
+
+    blockLabel.setText("Block: " + juce::String(audioProcessor.getCurrentBlockSize()),
+                       juce::dontSendNotification);
+
+    sampleRateLabel.setText("SR: " + juce::String(audioProcessor.getCurrentSampleRateHz(), 0) + " Hz",
+                            juce::dontSendNotification);
+
+    grLabel.setText("GR: " + juce::String(audioProcessor.getGainReductionDb(), 1) + " dB",
+                    juce::dontSendNotification);
 }
