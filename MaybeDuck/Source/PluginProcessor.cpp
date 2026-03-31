@@ -41,10 +41,10 @@ juce::AudioProcessorValueTreeState::ParameterLayout MaybeDuckAudioProcessor::cre
         "ratio", "Ratio", juce::NormalisableRange<float>(1.0f, 50.0f, 0.1f), 4.0f));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "attack", "Attack", juce::NormalisableRange<float>(0.1f, 5000.0f, 0.1f, 0.5f), 10.0f));
+        "attack", "Attack", juce::NormalisableRange<float>(0.5f, 5000.0f, 0.1f, 0.5f), 10.0f));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "release", "Release", juce::NormalisableRange<float>(1.0f, 5000.0f, 1.0f, 0.5f), 100.0f));
+        "release", "Release", juce::NormalisableRange<float>(20.0f, 5000.0f, 1.0f, 0.5f), 100.0f));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "knee", "Knee", juce::NormalisableRange<float>(0.0f, 24.0f, 0.1f), 6.0f));
@@ -60,6 +60,8 @@ juce::AudioProcessorValueTreeState::ParameterLayout MaybeDuckAudioProcessor::cre
 
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         "limiter", "Limiter", false));
+
+    params.push_back(std::make_unique<juce::AudioParameterFloat>("lowCutoff", "Low Freq", juce::NormalisableRange<float>(20.0f, 1000.0f, 0.1f, 0.5f), 225.0f));
 
     return {params.begin(), params.end()};
 }
@@ -131,7 +133,10 @@ void MaybeDuckAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlo
 {
     leftProcessor.reset(sampleRate);
     rightProcessor.reset(sampleRate);
-
+    lpf.reset();
+    hpf.reset();
+    lpf.prepare(sampleRate);
+    hpf.prepare(sampleRate);
     currentSampleRate.store(sampleRate);
     currentBlockSize.store(samplesPerBlock);
 }

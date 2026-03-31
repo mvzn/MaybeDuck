@@ -1,7 +1,5 @@
 #pragma once
-#include <cmath>
-#include <limits>
-#include <algorithm>
+#include <JuceHeader.h>
 
 const double TLD_AUDIO_ENVELOPE_ANALOG_TC = -0.99967234081320612357829304641019;
 inline double peak_gain_for_q(double Q)

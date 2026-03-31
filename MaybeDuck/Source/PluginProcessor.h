@@ -10,6 +10,7 @@
 
 #include <JuceHeader.h>
 #include "DynamicsCore.h"
+#include "CrossoverCore.h"
 
 //==============================================================================
 /**
@@ -80,7 +81,9 @@ public:
 private:
     DynamicsProcessor leftProcessor;
     DynamicsProcessor rightProcessor;
-
+    FilterBiquad lpf;
+    FilterBiquad hpf;
+    
     // monitoring
     std::atomic<float> cpuUsagePercent { 0.0f };
     std::atomic<float> processTimeMs   { 0.0f };
