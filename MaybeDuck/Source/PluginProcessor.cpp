@@ -61,8 +61,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout MaybeDuckAudioProcessor::cre
     params.push_back(std::make_unique<juce::AudioParameterBool>(
         "limiter", "Limiter", false));
 
-    params.push_back(std::make_unique<juce::AudioParameterFloat>("lowCutoff", "Low Freq", juce::NormalisableRange<float>(20.0f, 1000.0f, 0.1f, 0.5f), 225.0f));
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "xoLowMid", "Low-Mid Xover",
+        juce::NormalisableRange<float>(40.0f, 2000.0f, 1.0f, 0.35f), 200.0f));
 
+    params.push_back(std::make_unique<juce::AudioParameterFloat>(
+        "xoMidHigh", "Mid-High Xover",
+        juce::NormalisableRange<float>(500.0f, 12000.0f, 1.0f, 0.35f), 2500.0f));
     return {params.begin(), params.end()};
 }
 
@@ -133,12 +138,19 @@ void MaybeDuckAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlo
 {
     leftProcessor.reset(sampleRate);
     rightProcessor.reset(sampleRate);
-    lpf.reset();
-    hpf.reset();
-    lpf.prepare(sampleRate);
-    hpf.prepare(sampleRate);
+    crossover.prepare(sampleRate);
     currentSampleRate.store(sampleRate);
     currentBlockSize.store(samplesPerBlock);
+}
+
+MaybeDuckAudioProcessor::BandControlValues
+MaybeDuckAudioProcessor::applyBandLink(const BandControlValues& gr, float linkAmount)
+{
+    // Placeholder architecture for future link control.
+    // Currently passes through unchanged when linkAmount = 0.
+    // Later you can replace with neighbor-linking or weighted linking.
+    juce::ignoreUnused(linkAmount);
+    return gr;
 }
 
 void MaybeDuckAudioProcessor::pushNextSampleIntoFifo(float sample,
@@ -247,6 +259,7 @@ void MaybeDuckAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juc
     // Alternatively, you can process the samples with the channels
     // interleaved by keeping the same state.
     DynamicsProcessorParameters params = leftProcessor.getParameters();
+    DynamicsProcessorParameters bandParams = lowBandProcessor.getParameters();
 
     params.threshold_dB = *apvts.getRawParameterValue("threshold");
     params.ratio = *apvts.getRawParameterValue("ratio");
@@ -259,6 +272,10 @@ void MaybeDuckAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juc
     params.hard_limit_gate = (*apvts.getRawParameterValue("limiter") > 0.5f);
     params.calculation = dynamicsProcessorType::kCompressor;
 
+    lowBandProcessor.setParameters(bandParams);
+    midBandProcessor.setParameters(bandParams);
+    highBandProcessor.setParameters(bandParams);
+
     leftProcessor.setParameters(params);
     rightProcessor.setParameters(params);
 
@@ -268,11 +285,15 @@ void MaybeDuckAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juc
     auto *left = mainInput.getWritePointer(0);
     auto *right = mainInput.getNumChannels() > 1 ? mainInput.getWritePointer(1) : nullptr;
 
+    const bool sidechainEnabled = (*apvts.getRawParameterValue("sidechainEnable") > 0.5f);
     const bool hasSidechainBus = getBusCount(true) > 1;
     const bool scConnected = hasSidechainBus && scInput.getNumChannels() > 0;
 
-    float blockPeakIn = 0.0f;
+    const float xoLowMid  = *apvts.getRawParameterValue("xoLowMid");
+    const float xoMidHigh = *apvts.getRawParameterValue("xoMidHigh");
+    crossover.setCutoffs(xoLowMid, xoMidHigh);
 
+    float blockPeakIn = 0.0f;
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
     {
         float scL = 0.0f;
@@ -281,10 +302,14 @@ void MaybeDuckAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juc
         float inR = mainInput.getNumChannels() > 1 ? mainInput.getReadPointer(1)[sample] : inL;
         float inputMono = 0.5f * (inL + inR);
         float scMono = 0.5f * (scL + scR);
-        blockPeakIn = std::max(blockPeakIn, std::abs(inputMono));
-        
 
-        if (params.enable_sc && scConnected)
+        blockPeakIn = std::max(blockPeakIn, std::abs(inputMono));
+
+        auto audioBands = crossover.splitAudio(inL, inR);
+
+        ThreeBandStereoSample detectorBands;
+
+        if (sidechainEnabled && scConnected)
         {
             scL = scInput.getReadPointer(0)[sample];
             scR = scInput.getNumChannels() > 1 ? scInput.getReadPointer(1)[sample] : scL;

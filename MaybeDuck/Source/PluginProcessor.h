@@ -79,11 +79,23 @@ public:
     bool getSidechainFftData(float* dest);
     bool getOutputFftData(float* dest);
 private:
-    DynamicsProcessor leftProcessor;
-    DynamicsProcessor rightProcessor;
-    FilterBiquad lpf;
-    FilterBiquad hpf;
-    
+    DynamicsProcessor leftProcessor, rightProcessor;
+    DynamicsProcessor lowBandProcessor, midBandProcessor, highBandProcessor;
+    ThreeBandCrossover crossover;
+
+    DynamicsProcessor lowBandProcessor;
+    DynamicsProcessor midBandProcessor;
+    DynamicsProcessor highBandProcessor;
+    // Band link / Tuning for speech
+    struct BandControlValues
+    {
+        float lowDb  = 0.0f; // positive GR amount in dB
+        float midDb  = 0.0f;
+        float highDb = 0.0f;
+    };
+
+    BandControlValues applyBandLink(const BandControlValues& gr, float linkAmount);
+
     // monitoring
     std::atomic<float> cpuUsagePercent { 0.0f };
     std::atomic<float> processTimeMs   { 0.0f };
