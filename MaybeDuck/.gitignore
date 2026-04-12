@@ -1,0 +1,11 @@
+.stfolder/
+
+/*
+
+!/.gitignore
+!/MaybeDuck/
+
+/MaybeDuck/*
+!/MaybeDuck/MaybeDuck.jucer
+!/MaybeDuck/Source/
+!/MaybeDuck/Source/**
