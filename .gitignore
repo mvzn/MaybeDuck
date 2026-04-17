@@ -1,0 +1,17 @@
+/*
+!/.gitignore
+!/MaybeDuck/
+/MaybeDuck/*
+!/MaybeDuck/*.jucer
+!/MaybeDuck/Source/
+!/MaybeDuck/Source/**
+!/MaybeDuck/JuceLibraryCode/
+!/MaybeDuck/JuceLibraryCode/**
+
+**/.stfolder/
+**/Builds/**/build/
+**/*.o
+**/*.a
+**/*.so
+**/*.d
+**/*.vst3/
