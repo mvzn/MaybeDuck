@@ -9,6 +9,7 @@
 !/MaybeDuck/JuceLibraryCode/**
 
 **/.stfolder/
+**/.vscode/
 **/Builds/**/build/
 **/*.o
 **/*.a
