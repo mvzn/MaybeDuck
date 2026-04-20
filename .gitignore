@@ -16,3 +16,4 @@
 **/*.so
 **/*.d
 **/*.vst3/
+/NEXT_STEPS.local.md
