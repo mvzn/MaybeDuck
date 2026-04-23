@@ -265,23 +265,10 @@ protected:
         double yn_dB = 0.0;
         if (m_dynamics_params.calculation == dynamicsProcessorType::kCompressor)
 		{
-			// --- hard knee
-			if (!m_dynamics_params.soft_knee)
+			// --- calc gain with knee
+			if (m_dynamics_params.soft_knee && m_dynamics_params.soft_knee != 0.0)
 			{
-				// --- below threshold, unity
-				if (detect_dB <= m_dynamics_params.threshold_dB)
-					yn_dB = detect_dB;
-				else// --- above threshold, compress
-				{
-					if (m_dynamics_params.hard_limit_gate) // is limiter?
-						yn_dB = m_dynamics_params.threshold_dB;
-					else
-						yn_dB = m_dynamics_params.threshold_dB + (detect_dB - m_dynamics_params.threshold_dB) / m_dynamics_params.ratio;
-				}
-			}
-			else // --- calc gain with knee
-			{
-				// --- left side of knee, outside of width, unity gain zone
+                // --- left side of knee, outside of width, unity gain zone
 				if (2.0*(detect_dB - m_dynamics_params.threshold_dB) < -m_dynamics_params.knee_width_dB)
 					yn_dB = detect_dB;
 				// --- else inside the knee,
@@ -299,6 +286,19 @@ protected:
 				else if (2.0*(detect_dB - m_dynamics_params.threshold_dB) > m_dynamics_params.knee_width_dB)
 				{
 					if (m_dynamics_params.hard_limit_gate) // --- is limiter?
+						yn_dB = m_dynamics_params.threshold_dB;
+					else
+						yn_dB = m_dynamics_params.threshold_dB + (detect_dB - m_dynamics_params.threshold_dB) / m_dynamics_params.ratio;
+				}
+			}
+			else // --- hard knee
+			{
+				// --- below threshold, unity
+				if (detect_dB <= m_dynamics_params.threshold_dB)
+					yn_dB = detect_dB;
+				else// --- above threshold, compress
+				{
+					if (m_dynamics_params.hard_limit_gate) // is limiter?
 						yn_dB = m_dynamics_params.threshold_dB;
 					else
 						yn_dB = m_dynamics_params.threshold_dB + (detect_dB - m_dynamics_params.threshold_dB) / m_dynamics_params.ratio;

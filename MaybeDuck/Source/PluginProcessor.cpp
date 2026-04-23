@@ -41,13 +41,13 @@ juce::AudioProcessorValueTreeState::ParameterLayout MaybeDuckAudioProcessor::cre
         "ratio", "Ratio", juce::NormalisableRange<float>(1.0f, 50.0f, 0.1f), 4.0f));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "attack", "Attack", juce::NormalisableRange<float>(0.1f, 5000.0f, 0.1f, 0.5f), 10.0f));
+        "attack", "Attack", juce::NormalisableRange<float>(0.0f, 5000.0f, 0.1f, 0.5f), 10.0f));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "release", "Release", juce::NormalisableRange<float>(1.0f, 5000.0f, 1.0f, 0.5f), 100.0f));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
-        "knee", "Knee", juce::NormalisableRange<float>(0.0f, 24.0f, 0.1f), 6.0f));
+        "knee", "Knee", juce::NormalisableRange<float>(0.1f, 24.0f, 0.1f), 6.0f));
 
     params.push_back(std::make_unique<juce::AudioParameterFloat>(
         "output", "Output", juce::NormalisableRange<float>(-24.0f, 24.0f, 0.1f), 0.0f));
@@ -267,6 +267,7 @@ void MaybeDuckAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juc
     const bool scConnected = hasSidechainBus && scInput.getNumChannels() > 0;
 
     float blockPeakIn = 0.0f;
+    float sidechainPeakIn = 0.0f;
 
     for (int sample = 0; sample < buffer.getNumSamples(); ++sample)
     {
@@ -275,22 +276,20 @@ void MaybeDuckAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juc
         float inL = mainInput.getReadPointer(0)[sample];
         float inR = mainInput.getNumChannels() > 1 ? mainInput.getReadPointer(1)[sample] : inL;
         float inputMono = 0.5f * (inL + inR);
-        float scMono = 0.5f * (scL + scR);
         blockPeakIn = std::max(blockPeakIn, std::abs(inputMono));
-        
 
         if (params.enable_sc && scConnected)
         {
             scL = scInput.getReadPointer(0)[sample];
             scR = scInput.getNumChannels() > 1 ? scInput.getReadPointer(1)[sample] : scL;
-            blockPeakIn = std::max(blockPeakIn, std::abs(scMono));
+            float scMono = 0.5f * (scL + scR);
+            sidechainPeakIn = std::max(sidechainPeakIn, std::abs(scMono));
             leftProcessor.processSidechainInputSample(scL);
-            rightProcessor.processSidechainInputSample(scR);
-            scMono = 0.5f * (scL + scR);
+            rightProcessor.processSidechainInputSample(scR); 
+            pushNextSampleIntoFifo(scMono, sidechainFifo, sidechainFifoIndex, sidechainFftBuffer, sidechainBlockReady);
         }
 
         pushNextSampleIntoFifo(inputMono, inputFifo, inputFifoIndex, inputFftBuffer, inputBlockReady);
-        pushNextSampleIntoFifo(scMono, sidechainFifo, sidechainFifoIndex, sidechainFftBuffer, sidechainBlockReady);
 
         left[sample] = (float)leftProcessor.processSample(left[sample]);
 
@@ -313,12 +312,16 @@ void MaybeDuckAudioProcessor::processBlock(juce::AudioBuffer<float> &buffer, juc
                                   ? juce::Decibels::gainToDecibels(blockPeakIn)
                                   : -100.0f;
                                   
+    const float sidechainPeakDb = (sidechainPeakIn > 0.00001f)
+                                  ? juce::Decibels::gainToDecibels(sidechainPeakIn)
+                                  : -100.0f;
+
     // for above threshold and gr comparison
     const float thresholdDb = params.threshold_dB;
-    const float aboveThreshold = std::max(0.0f, blockPeakDb - thresholdDb); //NOT CORRECT IF PROPORTIONAL, scBlockPeakDb - thresholdDb
+    const float aboveThreshold = std::max(0.0f, (scConnected ? sidechainPeakDb : blockPeakDb)- thresholdDb); //NOT CORRECT IF PROPORTIONAL, scBlockPeakDb - thresholdDb
 
     // simple smoothing for UI
-    inputLevelSmoothedDb = juce::jmax(blockPeakDb, inputLevelSmoothedDb + 0.8f);       // fast rise, slow fall
+    inputLevelSmoothedDb = juce::jmax(scConnected ? sidechainPeakDb : blockPeakDb, inputLevelSmoothedDb + 0.8f);       // fast rise, slow fall
     gainReductionSmoothedDb = juce::jmax(grAmountDb, gainReductionSmoothedDb - 0.35f); // hold GR slightly
 
     gainReductionDb.store(avgGR);
