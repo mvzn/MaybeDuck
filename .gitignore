@@ -1,4 +1,6 @@
 /*
+!/.vscode/
+!/.vscode/**
 !/.gitignore
 !/
 /*
@@ -7,7 +9,6 @@
 !/Source/**
 
 **/.stfolder/
-**/.vscode/
 **/Builds/**/build/
 **/*.o
 **/*.a
