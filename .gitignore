@@ -1,12 +1,10 @@
 /*
 !/.gitignore
-!/MaybeDuck/
-/MaybeDuck/*
-!/MaybeDuck/*.jucer
-!/MaybeDuck/Source/
-!/MaybeDuck/Source/**
-!/MaybeDuck/JuceLibraryCode/
-!/MaybeDuck/JuceLibraryCode/**
+!/
+/*
+!/*.jucer
+!/Source/
+!/Source/**
 
 **/.stfolder/
 **/.vscode/
