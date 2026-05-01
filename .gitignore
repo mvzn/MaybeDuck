@@ -1,0 +1,25 @@
+# Ignore build artifacts
+**/Builds/**/
+**/*.o
+**/*.a
+**/*.so
+**/*.d
+**/*.vst3/
+
+# Ignore ST folder
+**/.stfolder/
+
+# Ignore local notes and files
+NEXT_STEPS.local.md
+/JuceLibraryCode/**
+
+# Keep source
+Source/**
+
+# Keep Projucer files
+*.jucer
+
+# Keep vscode properties
+.vscode/
+!.vscode/
+!.vscode/**
