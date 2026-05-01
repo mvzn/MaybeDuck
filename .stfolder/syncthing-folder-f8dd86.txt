@@ -1,5 +1,0 @@
-# This directory is a Syncthing folder marker.
-# Do not delete.
-
-folderID: z2a7t-mysue
-created: 2026-02-16T11:09:51Z
