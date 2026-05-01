@@ -14,7 +14,8 @@ NEXT_STEPS.local.md
 /JuceLibraryCode/**
 
 # Keep source
-Source/**
+!Source/
+!Source/**
 
 # Keep Projucer files
 *.jucer
