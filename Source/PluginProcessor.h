@@ -10,6 +10,7 @@
 
 #include <JuceHeader.h>
 #include "DynamicsCore.h"
+#include "CrossoverCore.h"
 
 //==============================================================================
 /**
@@ -80,6 +81,14 @@ public:
 private:
     DynamicsProcessor leftProcessor;
     DynamicsProcessor rightProcessor;
+    StereoMultibandCrossover crossover;
+
+    struct BandControlValues
+    {
+        std::array<float, StereoMultibandCrossover::numBands> db {};
+    };
+
+    BandControlValues applyBandLink(const BandControlValues& gr, float linkAmount);
 
     // monitoring
     std::atomic<float> cpuUsagePercent { 0.0f };
