@@ -83,6 +83,13 @@ private:
     DynamicsProcessor rightProcessor;
     StereoMultibandCrossover crossover;
 
+    struct BandControlValues
+    {
+        std::array<float, StereoMultibandCrossover::numBands> db {};
+    };
+
+    BandControlValues applyBandLink(const BandControlValues& gr, float linkAmount);
+
     // monitoring
     std::atomic<float> cpuUsagePercent { 0.0f };
     std::atomic<float> processTimeMs   { 0.0f };

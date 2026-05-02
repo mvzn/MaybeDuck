@@ -9,9 +9,9 @@
       "cppStandard": "c++17",
       "includePath": [
         "${workspaceFolder}/**",
-        "/home/mokram/MaybeDuck/MaybeDuck/JuceLibraryCode",
+        "/home/mokram/MaybeDuck/JuceLibraryCode",
         "/home/mokram/JUCE/modules",
-        "/home/mokram/MaybeDuck/MaybeDuck/Builds/LinuxMakefile"
+        "/home/mokram/MaybeDuck/Builds/LinuxMakefile"
       ],
       "defines": [
         "LINUX=1",
