@@ -1,5 +1,5 @@
 #pragma once
-#include <FXFunctions.h>
+#include "FXFunctions.h"
 
 enum class DetectModes
 {

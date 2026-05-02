@@ -10,6 +10,7 @@
 
 #include <JuceHeader.h>
 #include "DynamicsCore.h"
+#include "CrossoverCore.h"
 
 //==============================================================================
 /**
@@ -80,6 +81,7 @@ public:
 private:
     DynamicsProcessor leftProcessor;
     DynamicsProcessor rightProcessor;
+    StereoMultibandCrossover crossover;
 
     // monitoring
     std::atomic<float> cpuUsagePercent { 0.0f };

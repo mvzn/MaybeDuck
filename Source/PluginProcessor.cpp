@@ -132,6 +132,8 @@ void MaybeDuckAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlo
     leftProcessor.reset(sampleRate);
     rightProcessor.reset(sampleRate);
 
+    crossover.prepare(sampleRate);
+
     currentSampleRate.store(sampleRate);
     currentBlockSize.store(samplesPerBlock);
 }
